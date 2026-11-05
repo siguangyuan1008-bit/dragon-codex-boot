@@ -35,6 +35,8 @@ DEFAULTS = {
     "PlayerHeight": 1080,
     "ClientReadyDelaySeconds": 1.0,
     "ClientProcessNames": ["ChatGPT"],
+    "MatchClientWindow": True,
+    "ClientWindowClasses": ["chatgpt", "codex"],
 }
 
 CLIENT_CANDIDATES = ("codex-desktop", "chatgpt-desktop", "chatgpt", "codex")
@@ -155,6 +157,47 @@ def _rect(monitor):
     return (geometry.x, geometry.y, geometry.width, geometry.height)
 
 
+def _x11(*args):
+    try:
+        return subprocess.run(args, capture_output=True, text=True, timeout=3).stdout
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def parse_window_geometry(info):
+    """从 xwininfo 输出里取出可见窗口的物理像素矩形。"""
+    if "IsViewable" not in info:
+        return None
+    fields = {}
+    for line in info.splitlines():
+        key, _, value = line.strip().partition(":")
+        if key in ("Absolute upper-left X", "Absolute upper-left Y", "Width", "Height"):
+            try:
+                fields[key] = int(value)
+            except ValueError:
+                return None
+    if len(fields) != 4:
+        return None
+    return (fields["Absolute upper-left X"], fields["Absolute upper-left Y"],
+            fields["Width"], fields["Height"])
+
+
+def find_client_window(classes):
+    """返回 Codex 主窗口的物理像素矩形 (x, y, w, h)，X11 之外返回 None。"""
+    listing = _x11("xprop", "-root", "_NET_CLIENT_LIST")
+    if "#" not in listing:
+        return None
+    for window_id in listing.split("#", 1)[1].replace(",", " ").split():
+        if not any(name in _x11("xprop", "-id", window_id, "WM_CLASS").lower()
+                   for name in classes):
+            continue
+        info = _x11("xwininfo", "-id", window_id)
+        geometry = parse_window_geometry(info)
+        if geometry:
+            return geometry
+    return None
+
+
 def missing_plugins():
     wanted = {"gtksink": "gstreamer1.0-gtk3", "avdec_h264": "gstreamer1.0-libav"}
     missing = []
@@ -180,7 +223,7 @@ class Launcher:
         self.player = None
         self.bus = None
 
-    def build_window(self):
+    def build_window(self, rect=None):
         window = Gtk.Window(title=self.config["DisplayName"])
         window.set_decorated(False)
         window.set_keep_above(True)
@@ -210,7 +253,7 @@ class Launcher:
         overlay.add_overlay(skip)
         window.add(overlay)
 
-        if not self.config["Fullscreen"]:
+        if rect is None and not self.config["Fullscreen"]:
             width, height = self.scaled_size(window)
             window.set_default_size(width, height)
             window.set_position(Gtk.WindowPosition.CENTER)
@@ -218,7 +261,11 @@ class Launcher:
         self.window = window
         self.sink = sink
         window.show_all()
-        if self.config["Fullscreen"]:
+        if rect is not None:
+            scale = self.display_scale(window.get_display(), rect)
+            window.move(rect[0] // scale, rect[1] // scale)
+            window.resize(rect[2] // scale, rect[3] // scale)
+        elif self.config["Fullscreen"]:
             display = window.get_display()
             _, pointer_x, pointer_y = display.get_default_seat().get_pointer().get_position()
             monitor = (display.get_monitor_at_point(pointer_x, pointer_y)
@@ -228,6 +275,31 @@ class Launcher:
                           if _rect(display.get_monitor(i)) == target), 0)
             window.fullscreen_on_monitor(window.get_screen(), index)
         return window
+
+    @staticmethod
+    def display_scale(display, rect):
+        """客户端矩形是物理像素，GTK 用逻辑像素，按所在显示器的缩放换算。"""
+        center_x, center_y = rect[0] + rect[2] // 2, rect[1] + rect[3] // 2
+        for index in range(display.get_n_monitors()):
+            monitor = display.get_monitor(index)
+            geometry = monitor.get_geometry()
+            scale = monitor.get_scale_factor() or 1
+            if (geometry.x * scale <= center_x < (geometry.x + geometry.width) * scale
+                    and geometry.y * scale <= center_y < (geometry.y + geometry.height) * scale):
+                return scale
+        return 1
+
+    def wait_for_client_window(self):
+        deadline = time.monotonic() + 8
+        classes = [name.lower() for name in self.config["ClientWindowClasses"]]
+        while time.monotonic() < deadline:
+            rect = find_client_window(classes)
+            if rect:
+                report("WINDOW matched %dx%d+%d+%d" % (rect[2], rect[3], rect[0], rect[1]))
+                return rect
+            time.sleep(0.25)
+        report("WARNING: 没等到客户端窗口，改用全屏")
+        return None
 
     def scaled_size(self, window):
         width = int(self.config["PlayerWidth"])
@@ -292,9 +364,10 @@ class Launcher:
     def start(self):
         if not os.path.isfile(self.video):
             raise SystemExit("找不到启动视频：%s" % self.video)
-        self.build_window()
-        self.build_player()
         self.launch_client()
+        rect = self.wait_for_client_window() if self.config["MatchClientWindow"] else None
+        self.build_window(rect)
+        self.build_player()
         report("START video=%s" % self.video)
         self.player.set_state(Gst.State.PLAYING)
         self.started_at = time.monotonic()

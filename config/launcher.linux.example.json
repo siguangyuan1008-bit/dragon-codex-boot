@@ -11,5 +11,7 @@
   "PlayerWidth": 1920,
   "PlayerHeight": 1080,
   "ClientReadyDelaySeconds": 1.0,
-  "ClientProcessNames": ["ChatGPT"]
+  "ClientProcessNames": ["ChatGPT"],
+  "MatchClientWindow": true,
+  "ClientWindowClasses": ["chatgpt", "codex"]
 }

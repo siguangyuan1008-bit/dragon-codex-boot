@@ -51,6 +51,8 @@ python3 linux/dragon-codex-boot.py --config linux/launcher.json
 | `Fullscreen` | 是否全屏；为 `false` 时按 `PlayerWidth`/`PlayerHeight` 缩放到主显示器 |
 | `ClientReadyDelaySeconds` | 启动客户端后至少等待多久才认为就绪 |
 | `ClientProcessNames` | 用于判断"已经在运行"的进程名列表，默认 `["ChatGPT"]`；置空则每次都播放 |
+| `MatchClientWindow` | 默认 `true`：动画按 Codex 窗口的大小和位置显示；找不到窗口或非 X11 时退回全屏 |
+| `ClientWindowClasses` | 用于匹配窗口的 `WM_CLASS` 关键字（小写子串），默认 `["chatgpt", "codex"]` |
 
 换成自己的动画时，把 `Video` 指向你的 MP4，并按视频的实际分镜修改 `HoldAt`、`TransitionStart`、`TransitionEnd`。这些时间点不是通用模板。
 
@@ -59,7 +61,7 @@ python3 linux/dragon-codex-boot.py --config linux/launcher.json
 - 不把真实 Codex 窗口嵌进动画里的屏幕区域。Linux 上没有 DWM 缩略图那样的接口，也没有申请截图或辅助功能权限的跨桌面方案，因此和 macOS 版一样采用整屏淡出交接。
 - 默认只新增自己的应用菜单项。`--replace-codex-entry` 才会改写当前用户目录里的 Codex 入口副本，官方安装目录不动，可用 `uninstall.sh` 还原；它只影响点击图标，不影响已运行进程。
 - 从图标启动时传入的参数（例如 `codex://` 链接）会原样转发给客户端。
-- 全屏窗口显示在鼠标指针所在的那块显示器上；多显示器时另一块屏幕不受影响。
+- 默认不是全屏，而是覆盖 Codex 窗口本身（含标题栏），多显示器下也只占那一块区域。找不到窗口（例如 Wayland 会话）时退回全屏，并显示在鼠标指针所在的那块显示器上。
 - 关闭动画窗口后，焦点由窗口管理器交还给之前的窗口。若 Codex 没有自动获得焦点，点一下它的窗口即可。
 
 ## 验证

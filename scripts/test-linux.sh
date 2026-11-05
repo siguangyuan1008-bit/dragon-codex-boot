@@ -24,6 +24,23 @@ assert not missing, "缺少字段: %s" % missing
 assert config["HoldAt"] <= config["TransitionStart"] < config["TransitionEnd"], "时间轴顺序不对"
 PY
 
+python3 - "$LAUNCHER" <<'PY' && pass "窗口几何解析" || fail "窗口几何解析"
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("dcb", sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+sample = """xwininfo: Window id: 0x3a00004 "ChatGPT"
+  Absolute upper-left X:  2676
+  Absolute upper-left Y:  64
+  Width: 2444
+  Height: 1536
+  Map State: IsViewable
+"""
+assert module.parse_window_geometry(sample) == (2676, 64, 2444, 1536)
+assert module.parse_window_geometry(sample.replace("IsViewable", "IsUnMapped")) is None
+assert module.parse_window_geometry("garbage") is None
+PY
+
 if ! python3 -c 'import gi; gi.require_version("Gtk", "3.0")' 2>/dev/null; then
     fail "缺少 python3-gi / GTK3"
 elif [ -z "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
@@ -47,7 +64,8 @@ else
   "PlayerWidth": 640,
   "PlayerHeight": 360,
   "ClientReadyDelaySeconds": 0.5,
-  "ClientProcessNames": []
+  "ClientProcessNames": [],
+  "MatchClientWindow": false
 }
 EOF
     if timeout 30 "$LAUNCHER" --config /tmp/dragon-codex-boot-test.json >/tmp/dragon-codex-boot-test.log 2>&1 \
