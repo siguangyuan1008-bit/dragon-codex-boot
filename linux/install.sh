@@ -9,9 +9,11 @@ APPS="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 ENTRY="$APPS/dragon-codex-boot.desktop"
 
 install_deps=0
+replace_entry=0
 for arg in "$@"; do
     case "$arg" in
         --install-deps) install_deps=1 ;;
+        --replace-codex-entry) replace_entry=1 ;;
         -h|--help) sed -n '2,6p' "$0"; exit 0 ;;
         *) echo "未知参数：$arg" >&2; exit 2 ;;
     esac
@@ -52,5 +54,38 @@ EOF
 
 command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$APPS" || true
 echo "已安装：$ENTRY"
+
+if [ "$replace_entry" -eq 1 ]; then
+    target=""
+    for candidate in "$APPS"/*.desktop /usr/share/applications/*.desktop; do
+        [ -f "$candidate" ] || continue
+        grep -q "x-scheme-handler/codex" "$candidate" 2>/dev/null || continue
+        case "$candidate" in
+            "$APPS/dragon-codex-boot.desktop") continue ;;
+        esac
+        target="$candidate"
+        break
+    done
+    if [ -z "$target" ]; then
+        echo "没有找到 Codex 的桌面入口，跳过替换。" >&2
+    else
+        local_entry="$APPS/$(basename "$target")"
+        if [ "$target" != "$local_entry" ]; then
+            cp "$target" "$local_entry"
+            : > "$local_entry.dragon-created"
+        elif [ ! -f "$local_entry.dragon-backup" ]; then
+            cp "$local_entry" "$local_entry.dragon-backup"
+        fi
+        python3 - "$local_entry" "$(command -v python3) $LAUNCHER --config $CONFIG" <<'PY'
+import sys
+path, exec_line = sys.argv[1], sys.argv[2]
+lines = open(path, encoding="utf-8").read().splitlines()
+out = ["Exec=" + exec_line if line.startswith("Exec=") else line for line in lines]
+open(path, "w", encoding="utf-8").write("\n".join(out) + "\n")
+PY
+        echo "已替换启动入口：$local_entry（原文件备份为 .dragon-backup）"
+    fi
+fi
+
 echo "验证：$LAUNCHER --config $CONFIG --verify"
 "$LAUNCHER" --config "$CONFIG" --verify

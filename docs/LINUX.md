@@ -20,10 +20,13 @@ sudo apt-get install -y python3-gi gir1.2-gtk-3.0 gir1.2-gstreamer-1.0 gstreamer
 ```sh
 ./linux/install.sh                  # 检查依赖，写入 ~/.local/share/applications/dragon-codex-boot.desktop
 ./linux/install.sh --install-deps   # 缺依赖时用 apt 自动安装
+./linux/install.sh --replace-codex-entry   # 额外把 Codex 自己的桌面入口指向本启动器
 ./linux/uninstall.sh                # 只移除应用菜单入口
 ```
 
-安装后在应用列表里搜索 "Dragon Codex Boot" 即可启动。也可以直接运行：
+安装后在应用列表里搜索 "Dragon Codex Boot" 即可启动。加上 `--replace-codex-entry` 后，点原来的 Codex / ChatGPT 图标也会先播放动画：脚本把该入口的 `Exec` 改成启动器，原文件备份为 `*.desktop.dragon-backup`，`uninstall.sh` 会还原。播放失败时启动器会直接打开 Codex，不会让你打不开软件。
+
+也可以直接运行：
 
 ```sh
 python3 linux/dragon-codex-boot.py --config linux/launcher.json
@@ -51,7 +54,8 @@ python3 linux/dragon-codex-boot.py --config linux/launcher.json
 ## 与 Windows / macOS 版的差别
 
 - 不把真实 Codex 窗口嵌进动画里的屏幕区域。Linux 上没有 DWM 缩略图那样的接口，也没有申请截图或辅助功能权限的跨桌面方案，因此和 macOS 版一样采用整屏淡出交接。
-- 不替换、不改写官方 Codex 的桌面入口，只新增自己的应用菜单项。
+- 默认只新增自己的应用菜单项。`--replace-codex-entry` 才会改写当前用户目录里的 Codex 入口副本，官方安装目录不动，可用 `uninstall.sh` 还原；它只影响点击图标，不影响已运行进程。
+- 从图标启动时传入的参数（例如 `codex://` 链接）会原样转发给客户端。
 - 全屏窗口显示在主显示器上；多显示器时另一块屏幕不受影响。
 - 关闭动画窗口后，焦点由窗口管理器交还给之前的窗口。若 Codex 没有自动获得焦点，点一下它的窗口即可。
 

@@ -116,6 +116,8 @@ def find_client():
                 continue
             for line in text.splitlines():
                 if line.startswith("Exec="):
+                    if "dragon-codex-boot" in line:
+                        continue  # 跳过被替换成启动器自己的入口，避免自我循环
                     argv = parse_exec(line[5:])
                     if argv and shutil.which(argv[0]):
                         return argv
@@ -372,7 +374,7 @@ def main():
     parser = argparse.ArgumentParser(description="Dragon Codex Boot (Linux)")
     parser.add_argument("--config", help="launcher.json 路径")
     parser.add_argument("--verify", action="store_true", help="只检查环境与视频，不播放")
-    args = parser.parse_args()
+    args, extra_args = parser.parse_known_args()
 
     config_path = find_config(args.config)
     config, config_dir, missing = load_config(config_path)
@@ -380,14 +382,23 @@ def main():
         report("WARNING: 配置缺少字段，使用默认值：%s" % ", ".join(missing))
 
     Gst.init(None)
-    client_cmd = config["ClientCommand"] or find_client()
+    client_cmd = (config["ClientCommand"] or find_client() or []) + extra_args
 
     if args.verify:
         return verify(config, config_dir, client_cmd)
 
     launcher = Launcher(config, config_dir)
     launcher.client_cmd = client_cmd
-    launcher.start()
+    try:
+        launcher.start()
+    except SystemExit as error:
+        # 播放失败时不能连累客户端：仍然把 Codex 打开。
+        report("ERROR: %s" % (error.code or "启动失败"))
+        if client_cmd:
+            report("FALLBACK: 直接启动客户端")
+            subprocess.Popen(client_cmd, stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL, start_new_session=True)
+        return 1
     Gtk.main()
     return 0
 

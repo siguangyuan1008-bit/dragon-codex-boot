@@ -12,4 +12,18 @@ else
     echo "没有找到 $ENTRY"
 fi
 
+for backup in "$APPS"/*.desktop.dragon-backup; do
+    [ -f "$backup" ] || continue
+    restored="${backup%.dragon-backup}"
+    mv -f "$backup" "$restored"
+    echo "已恢复：$restored"
+done
+
+for marker in "$APPS"/*.desktop.dragon-created; do
+    [ -f "$marker" ] || continue
+    created="${marker%.dragon-created}"
+    rm -f "$created" "$marker"
+    echo "已移除替换入口：$created"
+done
+
 command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$APPS" || true
