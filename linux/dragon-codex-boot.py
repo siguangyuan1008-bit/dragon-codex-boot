@@ -157,6 +157,27 @@ def _rect(monitor):
     return (geometry.x, geometry.y, geometry.width, geometry.height)
 
 
+def cached_rect_path():
+    return os.path.join(state_dir(), "window.json")
+
+
+def load_cached_rect():
+    try:
+        with open(cached_rect_path(), encoding="utf-8") as handle:
+            rect = json.load(handle)
+        return (int(rect["x"]), int(rect["y"]), int(rect["w"]), int(rect["h"]))
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def save_cached_rect(rect):
+    try:
+        with open(cached_rect_path(), "w", encoding="utf-8") as handle:
+            json.dump({"x": rect[0], "y": rect[1], "w": rect[2], "h": rect[3]}, handle)
+    except OSError:
+        pass
+
+
 def _x11(*args):
     try:
         return subprocess.run(args, capture_output=True, text=True, timeout=3).stdout
@@ -296,10 +317,31 @@ class Launcher:
             rect = find_client_window(classes)
             if rect:
                 report("WINDOW matched %dx%d+%d+%d" % (rect[2], rect[3], rect[0], rect[1]))
+                save_cached_rect(rect)
                 return rect
             time.sleep(0.25)
         report("WARNING: 没等到客户端窗口，改用全屏")
         return None
+
+    def adjust_to_window(self, attempts=40):
+        """先按上次的位置播，客户端窗口出现后再校正一次，避免动画晚于窗口。"""
+        if self.finishing:
+            return False
+        classes = [name.lower() for name in self.config["ClientWindowClasses"]]
+        rect = find_client_window(classes)
+        if rect:
+            save_cached_rect(rect)
+            scale = self.display_scale(self.window.get_display(), rect)
+            current = self.window.get_position() + self.window.get_size()
+            if current != (rect[0] // scale, rect[1] // scale,
+                           rect[2] // scale, rect[3] // scale):
+                self.window.move(rect[0] // scale, rect[1] // scale)
+                self.window.resize(rect[2] // scale, rect[3] // scale)
+                report("WINDOW adjusted %dx%d+%d+%d" % (rect[2], rect[3], rect[0], rect[1]))
+            return False
+        if attempts > 1:
+            GLib.timeout_add(250, self.adjust_to_window, attempts - 1)
+        return False
 
     def scaled_size(self, window):
         width = int(self.config["PlayerWidth"])
@@ -364,6 +406,17 @@ class Launcher:
     def start(self):
         if not os.path.isfile(self.video):
             raise SystemExit("找不到启动视频：%s" % self.video)
+        cached = load_cached_rect() if self.config["MatchClientWindow"] else None
+        if cached:
+            self.build_window(cached)
+            self.build_player()
+            report("START video=%s" % self.video)
+            self.player.set_state(Gst.State.PLAYING)
+            self.started_at = time.monotonic()
+            self.launch_client()
+            GLib.timeout_add(250, self.adjust_to_window)
+            GLib.timeout_add(50, self.tick)
+            return
         self.launch_client()
         rect = self.wait_for_client_window() if self.config["MatchClientWindow"] else None
         self.build_window(rect)
