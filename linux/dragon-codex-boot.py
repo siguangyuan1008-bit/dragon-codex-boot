@@ -541,6 +541,11 @@ def main():
 
     if client_running(config["ClientProcessNames"]):
         report("ALREADY RUNNING: 只打开/聚焦客户端，不播动画")
+        if config["MatchClientWindow"]:
+            # 顺手刷新窗口位置，避免下次冷启动按旧位置起播。
+            rect = find_client_window([name.lower() for name in config["ClientWindowClasses"]])
+            if rect:
+                save_cached_rect(rect)
         if client_cmd:
             subprocess.Popen(client_cmd, stdout=subprocess.DEVNULL,
                              stderr=subprocess.DEVNULL, start_new_session=True)
