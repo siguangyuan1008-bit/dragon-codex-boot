@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Linux：新增 Python + GTK3 + GStreamer 启动器，全屏播放动画、后台启动 Codex、按配置时间淡出交接，支持 Esc 跳过与 `--verify` 自检。
+- Linux：只在 Codex 未运行时播放动画，已运行则仅聚焦；动画跟随鼠标所在显示器播放。
 - Linux：新增应用菜单安装/卸载脚本、独立配置模板、`scripts/test-linux.sh` 自检和 `docs/LINUX.md`。
 - macOS：可选登录监视器支持从原 Codex 图标启动动画，并按可见 Codex 窗口位置、尺寸和连续圆角显示；新增安装与卸载脚本。
 - 新增 Swift 原生 macOS 启动器，使用 AVKit 播放动画并在结束时交接到 Codex。

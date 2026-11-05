@@ -34,6 +34,7 @@ DEFAULTS = {
     "PlayerWidth": 1920,
     "PlayerHeight": 1080,
     "ClientReadyDelaySeconds": 1.0,
+    "ClientProcessNames": ["ChatGPT"],
 }
 
 CLIENT_CANDIDATES = ("codex-desktop", "chatgpt-desktop", "chatgpt", "codex")
@@ -131,6 +132,29 @@ def resolve_video(config, config_dir):
     return os.path.abspath(path)
 
 
+def client_running(names):
+    """看 /proc 里有没有同名进程，用来区分「冷启动」和「再点一次图标」。"""
+    if not names:
+        return False
+    me = os.getpid()
+    for entry in os.listdir("/proc"):
+        if not entry.isdigit() or int(entry) == me:
+            continue
+        try:
+            with open("/proc/%s/comm" % entry, encoding="utf-8") as handle:
+                if handle.read().strip() in names:
+                    return True
+        except OSError:
+            continue
+    return False
+
+
+def _rect(monitor):
+    """Gdk.Rectangle 的 == 不可靠，转成元组比较。"""
+    geometry = monitor.get_geometry()
+    return (geometry.x, geometry.y, geometry.width, geometry.height)
+
+
 def missing_plugins():
     wanted = {"gtksink": "gstreamer1.0-gtk3", "avdec_h264": "gstreamer1.0-libav"}
     missing = []
@@ -197,10 +221,13 @@ class Launcher:
         window.show_all()
         if self.config["Fullscreen"]:
             display = window.get_display()
-            monitor = display.get_primary_monitor() or display.get_monitor(0)
-            geometry = monitor.get_geometry()
-            window.move(geometry.x, geometry.y)
-            window.fullscreen()
+            _, pointer_x, pointer_y = display.get_default_seat().get_pointer().get_position()
+            monitor = (display.get_monitor_at_point(pointer_x, pointer_y)
+                       or display.get_primary_monitor() or display.get_monitor(0))
+            target = _rect(monitor)
+            index = next((i for i in range(display.get_n_monitors())
+                          if _rect(display.get_monitor(i)) == target), 0)
+            window.fullscreen_on_monitor(window.get_screen(), index)
         return window
 
     def scaled_size(self, window):
@@ -386,6 +413,13 @@ def main():
 
     if args.verify:
         return verify(config, config_dir, client_cmd)
+
+    if client_running(config["ClientProcessNames"]):
+        report("ALREADY RUNNING: 只打开/聚焦客户端，不播动画")
+        if client_cmd:
+            subprocess.Popen(client_cmd, stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL, start_new_session=True)
+        return 0
 
     launcher = Launcher(config, config_dir)
     launcher.client_cmd = client_cmd

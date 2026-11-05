@@ -1,6 +1,8 @@
 # Linux 版
 
-Linux 版位于 `linux/`，是一个 Python 3 + GTK3 + GStreamer 启动器，不依赖 .NET、WPF 或 DWM。它在主显示器全屏播放本地 MP4，同时后台启动 Codex 桌面客户端，并在配置的时间点淡出、把屏幕交还给客户端。
+Linux 版位于 `linux/`，是一个 Python 3 + GTK3 + GStreamer 启动器，不依赖 .NET、WPF 或 DWM。它在鼠标所在的显示器上全屏播放本地 MP4，同时后台启动 Codex 桌面客户端，并在配置的时间点淡出、把屏幕交还给客户端。
+
+只有 Codex 还没运行时才播放动画。已经在运行（`ClientProcessNames` 里的进程存在）时，点图标只做打开/聚焦，不再重复播一遍。
 
 ## 依赖
 
@@ -48,6 +50,7 @@ python3 linux/dragon-codex-boot.py --config linux/launcher.json
 | `Volume` | 0.0–1.0 |
 | `Fullscreen` | 是否全屏；为 `false` 时按 `PlayerWidth`/`PlayerHeight` 缩放到主显示器 |
 | `ClientReadyDelaySeconds` | 启动客户端后至少等待多久才认为就绪 |
+| `ClientProcessNames` | 用于判断"已经在运行"的进程名列表，默认 `["ChatGPT"]`；置空则每次都播放 |
 
 换成自己的动画时，把 `Video` 指向你的 MP4，并按视频的实际分镜修改 `HoldAt`、`TransitionStart`、`TransitionEnd`。这些时间点不是通用模板。
 
@@ -56,7 +59,7 @@ python3 linux/dragon-codex-boot.py --config linux/launcher.json
 - 不把真实 Codex 窗口嵌进动画里的屏幕区域。Linux 上没有 DWM 缩略图那样的接口，也没有申请截图或辅助功能权限的跨桌面方案，因此和 macOS 版一样采用整屏淡出交接。
 - 默认只新增自己的应用菜单项。`--replace-codex-entry` 才会改写当前用户目录里的 Codex 入口副本，官方安装目录不动，可用 `uninstall.sh` 还原；它只影响点击图标，不影响已运行进程。
 - 从图标启动时传入的参数（例如 `codex://` 链接）会原样转发给客户端。
-- 全屏窗口显示在主显示器上；多显示器时另一块屏幕不受影响。
+- 全屏窗口显示在鼠标指针所在的那块显示器上；多显示器时另一块屏幕不受影响。
 - 关闭动画窗口后，焦点由窗口管理器交还给之前的窗口。若 Codex 没有自动获得焦点，点一下它的窗口即可。
 
 ## 验证

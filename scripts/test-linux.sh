@@ -46,7 +46,8 @@ else
   "Fullscreen": false,
   "PlayerWidth": 640,
   "PlayerHeight": 360,
-  "ClientReadyDelaySeconds": 0.5
+  "ClientReadyDelaySeconds": 0.5,
+  "ClientProcessNames": []
 }
 EOF
     if timeout 30 "$LAUNCHER" --config /tmp/dragon-codex-boot-test.json >/tmp/dragon-codex-boot-test.log 2>&1 \

@@ -10,5 +10,6 @@
   "Fullscreen": true,
   "PlayerWidth": 1920,
   "PlayerHeight": 1080,
-  "ClientReadyDelaySeconds": 1.0
+  "ClientReadyDelaySeconds": 1.0,
+  "ClientProcessNames": ["ChatGPT"]
 }
