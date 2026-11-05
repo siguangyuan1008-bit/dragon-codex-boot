@@ -1,8 +1,17 @@
 # Dragon Codex Boot
 
-为 Codex 桌面客户端播放自定义启动动画，并把动画结尾自然交接到真实、可操作的软件窗口。仓库包含 Windows 和 macOS 实现。
+为 Codex 桌面客户端播放自定义启动动画，并把动画结尾自然交接到真实、可操作的软件窗口。仓库包含 Windows、macOS 和 Linux 实现。
 
 **社区独立项目，与 OpenAI 无隶属关系。** 源码使用 MIT 许可证。仓库与默认程序包包含一段完整的 1080p 龙娘启动动画，解压即可播放，也支持换成自己的 MP4。视频许可说明见 [随附媒体说明](media/MEDIA_NOTICE.md)。
+
+## Linux 版本
+
+`linux/` 下是一个 Python + GTK3 + GStreamer 启动器，适用于 Ubuntu 22.04/24.04 及同类发行版。全屏播放动画、后台启动 Codex，在配置的时间点淡出并交还屏幕。安装与限制见 [Linux 使用说明](docs/LINUX.md)。
+
+```sh
+./linux/install.sh --install-deps   # 安装依赖并加入应用菜单
+./scripts/test-linux.sh             # 自检
+```
 
 ## macOS 版本
 

@@ -1,0 +1,24 @@
+name: Linux build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install GStreamer and GTK runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-gi gir1.2-gtk-3.0 gir1.2-gstreamer-1.0 \
+            gstreamer1.0-tools gstreamer1.0-gtk3 gstreamer1.0-libav xvfb
+      - name: Run Linux self-test
+        run: xvfb-run -a ./scripts/test-linux.sh
