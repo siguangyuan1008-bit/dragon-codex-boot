@@ -186,7 +186,6 @@ class Launcher:
         window.set_keep_above(True)
         window.set_skip_taskbar_hint(True)
         window.set_skip_pager_hint(True)
-        window.set_resizable(False)
         window.connect("key-press-event", self.on_key)
         window.connect("destroy", lambda *_: Gtk.main_quit())
         window.realize()
