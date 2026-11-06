@@ -243,6 +243,8 @@ class Launcher:
         self.window = None
         self.player = None
         self.bus = None
+        self.crop = None
+        self.target_ratio = None
 
     def build_window(self, rect=None):
         window = Gtk.Window(title=self.config["DisplayName"])
@@ -274,9 +276,10 @@ class Launcher:
         overlay.add_overlay(skip)
         window.add(overlay)
 
+        windowed_size = None
         if rect is None and not self.config["Fullscreen"]:
-            width, height = self.scaled_size(window)
-            window.set_default_size(width, height)
+            windowed_size = self.scaled_size(window)
+            window.set_default_size(*windowed_size)
             window.set_position(Gtk.WindowPosition.CENTER)
 
         self.window = window
@@ -286,15 +289,19 @@ class Launcher:
             scale = self.display_scale(window.get_display(), rect)
             window.move(rect[0] // scale, rect[1] // scale)
             window.resize(rect[2] // scale, rect[3] // scale)
+            self.target_ratio = rect[2] / rect[3]
         elif self.config["Fullscreen"]:
             display = window.get_display()
             _, pointer_x, pointer_y = display.get_default_seat().get_pointer().get_position()
             monitor = (display.get_monitor_at_point(pointer_x, pointer_y)
                        or display.get_primary_monitor() or display.get_monitor(0))
             target = _rect(monitor)
+            self.target_ratio = target[2] / target[3]
             index = next((i for i in range(display.get_n_monitors())
                           if _rect(display.get_monitor(i)) == target), 0)
             window.fullscreen_on_monitor(window.get_screen(), index)
+        else:
+            self.target_ratio = windowed_size[0] / max(1, windowed_size[1])
         return window
 
     @staticmethod
@@ -359,12 +366,43 @@ class Launcher:
         player.set_property("video-sink", self.sink)
         player.set_property("uri", Gst.filename_to_uri(self.video))
         player.set_property("volume", float(self.config["Volume"]))
+        self.crop = Gst.ElementFactory.make("videocrop", "crop")
+        if self.crop is not None:
+            player.set_property("video-filter", self.crop)
         bus = player.get_bus()
         bus.add_signal_watch()
         bus.connect("message::eos", lambda *_: self.skip())
         bus.connect("message::error", self.on_error)
         self.player = player
         self.bus = bus
+
+    def crop_to_fill(self):
+        """裁掉视频多出来的边，铺满窗口，和 macOS 版的填充模式一致。"""
+        if self.crop is None or not self.target_ratio:
+            return
+        self.player.set_state(Gst.State.PAUSED)
+        result, _, _ = self.player.get_state(5 * Gst.SECOND)
+        if result != Gst.StateChangeReturn.SUCCESS:
+            return
+        caps = self.sink.get_static_pad("sink").get_current_caps()
+        if caps is None or caps.get_size() == 0:
+            return
+        structure = caps.get_structure(0)
+        ok_width, width = structure.get_int("width")
+        ok_height, height = structure.get_int("height")
+        if not (ok_width and ok_height and width and height):
+            return
+        video_ratio = width / height
+        if abs(video_ratio - self.target_ratio) < 0.01:
+            return
+        if video_ratio > self.target_ratio:
+            side = max(0, (width - int(round(height * self.target_ratio))) // 2)
+            self.crop.set_property("left", side)
+            self.crop.set_property("right", side)
+        else:
+            side = max(0, (height - int(round(width / self.target_ratio))) // 2)
+            self.crop.set_property("top", side)
+            self.crop.set_property("bottom", side)
 
     def on_error(self, _bus, message):
         error, debug = message.parse_error()
@@ -410,6 +448,7 @@ class Launcher:
         if cached:
             self.build_window(cached)
             self.build_player()
+            self.crop_to_fill()
             report("START video=%s" % self.video)
             self.player.set_state(Gst.State.PLAYING)
             self.started_at = time.monotonic()
@@ -421,6 +460,7 @@ class Launcher:
         rect = self.wait_for_client_window() if self.config["MatchClientWindow"] else None
         self.build_window(rect)
         self.build_player()
+        self.crop_to_fill()
         report("START video=%s" % self.video)
         self.player.set_state(Gst.State.PLAYING)
         self.started_at = time.monotonic()

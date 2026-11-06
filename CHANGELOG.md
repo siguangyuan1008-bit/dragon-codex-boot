@@ -6,6 +6,7 @@
 - Linux：只在 Codex 未运行时播放动画，已运行则仅聚焦；动画跟随鼠标所在显示器播放。
 - Linux：动画默认按 Codex 窗口的大小和位置显示（`MatchClientWindow`），找不到窗口时退回全屏。
 - Linux：记住上次的窗口位置，冷启动时动画立即出现，客户端窗口出现后再校正位置。
+- Linux：视频改为填充模式，按窗口比例裁掉多余的边，不再出现上下黑边。
 - Linux：新增应用菜单安装/卸载脚本、独立配置模板、`scripts/test-linux.sh` 自检和 `docs/LINUX.md`。
 - macOS：可选登录监视器支持从原 Codex 图标启动动画，并按可见 Codex 窗口位置、尺寸和连续圆角显示；新增安装与卸载脚本。
 - 新增 Swift 原生 macOS 启动器，使用 AVKit 播放动画并在结束时交接到 Codex。
