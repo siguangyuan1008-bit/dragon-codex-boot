@@ -252,6 +252,12 @@ class Launcher:
         window.set_skip_pager_hint(True)
         window.connect("key-press-event", self.on_key)
         window.connect("destroy", lambda *_: Gtk.main_quit())
+        # An alpha-capable visual keeps mutter from unredirecting the fullscreen
+        # window; that unredirect toggles NVIDIA's scaling/mode and flashes black.
+        visual = window.get_screen().get_rgba_visual()
+        if visual is not None:
+            window.set_visual(visual)
+        window.set_app_paintable(True)
         window.realize()
         css = Gtk.CssProvider()
         css.load_from_data(b"window { background-color: #000000; }")
